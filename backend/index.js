@@ -28,8 +28,8 @@ const startServer = async () => {
     const dbConnected = await connectDB();
     
     // Middleware
-    app.use(express.json({ limit: '50mb' }));
-    app.use(express.urlencoded({ extended: true }));
+    app.use(express.json({ limit: '100mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '100mb' }));
     app.use(cors());
 
     // Basic route
@@ -57,9 +57,17 @@ const startServer = async () => {
       let rawBody = '';
       req.on('data', chunk => { rawBody += chunk; });
       req.on('end', () => {
-        console.log('[TEST] raw body:', rawBody);
+        console.log('[TEST] raw body length:', rawBody.length);
+        console.log('[TEST] raw body preview:', rawBody.substring(0, 200));
         console.log('[TEST] req.body:', req.body);
-        res.json({ received: req.body });
+        console.log('[TEST] req.body.message:', req.body.message);
+        console.log('[TEST] req.body.message type:', typeof req.body.message);
+        res.json({ 
+          received: req.body,
+          message: req.body.message,
+          messageType: typeof req.body.message,
+          bodyKeys: Object.keys(req.body)
+        });
       });
     });
 
@@ -229,6 +237,7 @@ const startServer = async () => {
           console.log('[WebSocket] AI Answer:', aiResponse.response);
 
           // Emit AI response event back to the client
+          // Voice will be handled by react-speech-kit on the frontend
           console.log('[WebSocket] Emitting ai-response:', aiResponse.response);
           socket.emit('ai-response', {
             response: aiResponse.response,
