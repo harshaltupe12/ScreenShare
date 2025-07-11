@@ -1,23 +1,48 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSpeechSynthesis, useSpeechRecognition } from 'react-speech-kit';
+import { webSocketService } from '../../lib/websocket';
+
+interface Message {
+  id: number;
+  type: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+  ocrText?: string;
+}
 
 export default function MeetingRoomPage() {
+  // Prevent hydration issues by ensuring this component only renders on client
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+        </div>
+      </div>
+    );
+  }
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isAIVoiceEnabled, setIsAIVoiceEnabled] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-  const [messages, setMessages] = useState([
-    { id: 1, type: 'ai', content: "Hello! I'm your AI assistant. Share your screen and I'll help you with any questions.", timestamp: new Date() }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [meetingId, setMeetingId] = useState("");
-  const [user, setUser] = useState(null);
+  const [meetingId, setMeetingId] = useState<string>("");
+  const [user, setUser] = useState<any>(null);
+  const [isConnected, setIsConnected] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const router = useRouter();
   
   // TTS functionality
@@ -45,79 +70,116 @@ export default function MeetingRoomPage() {
     }
   }, [meetingId]);
 
+  // Add initial welcome message after component mounts to avoid hydration issues
+  useEffect(() => {
+    if (messages.length === 0) {
+      addMessage('ai', "Hello! I'm your AI assistant. Share your screen and I'll help you with any questions.");
+    }
+  }, [addMessage, messages.length]);
+
   // Check authentication
   useEffect(() => {
     const userData = localStorage.getItem('jerry_user');
+    console.log('[Auth] Raw user data from localStorage:', userData);
+    
     if (userData) {
-      const user = JSON.parse(userData);
-      if (user.isAuthenticated) {
-        setUser(user);
-      } else {
+      try {
+        const user = JSON.parse(userData);
+        console.log('[Auth] Parsed user data:', user);
+        
+        if (user.isAuthenticated) {
+          setUser(user);
+          console.log('[Auth] User authenticated:', user);
+        } else {
+          console.log('[Auth] User not authenticated, redirecting to signin');
+          router.push('/auth/simple');
+        }
+      } catch (error) {
+        console.error('[Auth] Error parsing user data:', error);
         router.push('/auth/simple');
       }
     } else {
+      console.log('[Auth] No user data found, redirecting to signin');
       router.push('/auth/simple');
     }
   }, [router]);
 
-  // WebSocket connection
+  // WebSocket connection with enhanced callbacks
   useEffect(() => {
     if (!user) return;
 
-    const ws = new WebSocket('ws://localhost:5000');
-    
-    ws.onopen = () => {
-      console.log('[WebSocket] Connected');
-      window.ws = ws; // Store WebSocket globally
-      ws.send(JSON.stringify({
-        type: 'join-meeting',
-        meetingId,
-        userId: user.id || 'anonymous',
-        userName: user.name || 'User'
-      }));
-    };
-
-    ws.onmessage = (event) => {
-      console.log('[WebSocket] Message received:', event.data);
-      let data;
-      try {
-        data = JSON.parse(event.data);
-      } catch (e) {
-        console.error('[WebSocket] Failed to parse message:', event.data);
-        return;
-      }
-      
-      if (data.type === 'ai-response' || data.response) {
-        const aiMessage = {
+    const callbacks = {
+      onConnect: () => {
+        console.log('[WebSocket] Connected');
+        setIsConnected(true);
+        webSocketService.joinMeeting(meetingId, user.id || 'anonymous', user.name || 'User');
+      },
+      onDisconnect: () => {
+        console.log('[WebSocket] Disconnected');
+        setIsConnected(false);
+      },
+      onError: (error: string) => {
+        console.error('[WebSocket] Error:', error);
+        addMessage('ai', `Connection error: ${error}. Trying to reconnect...`);
+      },
+              onAIResponseReceived: (data: { response: string; ocrText?: string }) => {
+        console.log('[WebSocket] AI Response received:', data);
+        const aiMessage: Message = {
           id: Date.now(),
           type: 'ai',
           content: data.response,
-          timestamp: new Date()
+          timestamp: new Date(),
+          ocrText: data.ocrText
         };
         
         setMessages(prev => [...prev, aiMessage]);
         setIsLoading(false);
         
-        // Speak AI response if voice is enabled
+        // Play voice using react-speech-kit
         if (isAIVoiceEnabled && data.response) {
-          speak({ text: data.response, rate: 0.9, pitch: 1.0 });
+          playVoice(data.response);
+        }
+      },
+      onScreenShareStarted: (data: { userId: string; userName: string }) => {
+        if (data.userId !== (user.id || 'anonymous')) {
+          addMessage('ai', `${data.userName} started sharing their screen.`);
+        }
+      },
+      onScreenShareStopped: (data: { userId: string; userName: string }) => {
+        if (data.userId !== (user.id || 'anonymous')) {
+          addMessage('ai', `${data.userName} stopped sharing their screen.`);
         }
       }
     };
 
-    ws.onerror = (err) => {
-      console.error('[WebSocket] Error:', err);
-    };
-    ws.onclose = () => {
-      console.log('[WebSocket] Disconnected');
-      window.ws = null;
-    };
+    webSocketService.connect(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000', callbacks);
 
     return () => {
-      ws.close();
-      window.ws = null;
+      webSocketService.disconnect();
     };
-  }, [user, meetingId]);
+  }, [user, meetingId, isAIVoiceEnabled]);
+
+  const addMessage = useCallback((type: 'user' | 'ai', content: string, ocrText?: string) => {
+    const message: Message = {
+      id: Date.now(),
+      type,
+      content,
+      timestamp: new Date(),
+      ocrText
+    };
+    setMessages(prev => [...prev, message]);
+  }, []);
+
+  const playVoice = (text: string) => {
+    if (isAIVoiceEnabled) {
+      speak({ 
+        text: text, 
+        rate: 0.9, 
+        pitch: 1.0,
+        voice: 'Google UK English Female' // You can customize the voice
+      });
+    }
+  };
 
   if (!user || !meetingId) {
     return (
@@ -140,7 +202,10 @@ export default function MeetingRoomPage() {
       if (!isScreenSharing) {
         // Start screen sharing
         const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { mediaSource: "screen" },
+          video: { 
+            cursor: 'always',
+            displaySurface: 'monitor',
+          },
           audio: false
         });
         
@@ -151,104 +216,77 @@ export default function MeetingRoomPage() {
           videoRef.current.srcObject = stream;
         }
 
-        // Send screen data to AI for analysis
-        setTimeout(() => {
-          captureAndAnalyzeScreen();
-        }, 1000);
+        // Notify WebSocket about screen share start
+        webSocketService.startScreenShare(meetingId, user.id || 'anonymous', user.name || 'User');
 
         // Add AI message about screen sharing
-        const screenShareMessage = {
-          id: Date.now(),
-          type: 'ai',
-          content: "🎯 Screen sharing started! I can now see your screen and help you with any questions about what you're working on.",
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, screenShareMessage]);
+        addMessage('ai', "🎯 Screen sharing started! I can now see your screen and help you with any questions about what you're working on.");
         
         // Speak the message if voice is enabled
         if (isAIVoiceEnabled) {
-          speak({ text: screenShareMessage.content, rate: 0.9, pitch: 1.0 });
+          speak({ text: "Screen sharing started! I can now see your screen and help you with any questions.", rate: 0.9, pitch: 1.0 });
         }
+
+        // Handle stream end
+        stream.getVideoTracks()[0].onended = () => {
+          handleStopScreenShare();
+        };
 
       } else {
-        // Stop screen sharing
-        if (screenStream) {
-          screenStream.getTracks().forEach(track => track.stop());
-          setScreenStream(null);
-        }
-        setIsScreenSharing(false);
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-
-        // Add AI message about stopping screen share
-        const stopShareMessage = {
-          id: Date.now(),
-          type: 'ai',
-          content: "Screen sharing stopped. I can still help you with general questions!",
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, stopShareMessage]);
-        
-        // Speak the message if voice is enabled
-        if (isAIVoiceEnabled) {
-          speak({ text: stopShareMessage.content, rate: 0.9, pitch: 1.0 });
-        }
+        handleStopScreenShare();
       }
     } catch (error) {
       console.error('Screen sharing error:', error);
-      alert('Failed to start screen sharing. Please try again.');
+      addMessage('ai', 'Failed to start screen sharing. Please try again.');
     }
   };
 
-  const captureAndAnalyzeScreen = async () => {
-    if (!videoRef.current) return;
+  const handleStopScreenShare = () => {
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      setScreenStream(null);
+    }
+    setIsScreenSharing(false);
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    // Notify WebSocket about screen share stop
+    webSocketService.stopScreenShare(meetingId, user.id || 'anonymous', user.name || 'User');
+
+    // Add AI message about stopping screen share
+    addMessage('ai', "Screen sharing stopped. I can still help you with general questions!");
+    
+    // Speak the message if voice is enabled
+    if (isAIVoiceEnabled) {
+      speak({ text: "Screen sharing stopped. I can still help you with general questions!", rate: 0.9, pitch: 1.0 });
+    }
+  };
+
+  const captureScreenSnapshot = async (): Promise<string | null> => {
+    if (!videoRef.current || !isScreenSharing) return null;
 
     try {
-      const canvas = document.createElement('canvas');
+      const canvas = canvasRef.current || document.createElement('canvas');
       const context = canvas.getContext('2d');
-      if (!context) return;
+      if (!context) return null;
 
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      context.drawImage(videoRef.current, 0, 0);
-
-      // Convert to base64
+      // Set canvas size to match video
+      canvas.width = videoRef.current.videoWidth || 1280;
+      canvas.height = videoRef.current.videoHeight || 720;
+      
+      // Draw video frame to canvas
+      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      
+      // Convert to base64 with compression
       const imageData = canvas.toDataURL('image/jpeg', 0.8);
-
-      // Send to backend for AI analysis
-      const response = await fetch('http://localhost:5000/api/ai/analyze-screen', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageData,
-          meetingId,
-          userId: user.id || 'anonymous'
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.analysis) {
-          const analysisMessage = {
-            id: Date.now(),
-            type: 'ai',
-            content: `🔍 Screen Analysis: ${data.analysis}`,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, analysisMessage]);
-          
-          // Speak the analysis if voice is enabled
-          if (isAIVoiceEnabled) {
-            speak({ text: analysisMessage.content, rate: 0.9, pitch: 1.0 });
-          }
-        }
-      }
+      
+      // Compress further if needed
+      return await webSocketService.compressImageData(imageData, 0.7);
     } catch (error) {
-      console.error('Screen analysis error:', error);
+      console.error('Failed to capture screen snapshot:', error);
+      return null;
     }
   };
 
@@ -263,91 +301,46 @@ export default function MeetingRoomPage() {
 
     const userMessage = {
       id: Date.now(),
-      type: 'user',
+      type: 'user' as const,
       content: inputMessage,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentMessage = inputMessage;
     setInputMessage("");
     setIsLoading(true);
 
     try {
       // Capture screen snapshot if screen sharing is active
-      let screenSnapshot = null;
-      if (isScreenSharing && videoRef.current) {
-        try {
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          if (context) {
-            canvas.width = videoRef.current.videoWidth;
-            canvas.height = videoRef.current.videoHeight;
-            context.drawImage(videoRef.current, 0, 0);
-            screenSnapshot = canvas.toDataURL('image/jpeg', 0.8);
-          }
-        } catch (error) {
-          console.error('Failed to capture screen snapshot:', error);
-        }
-      }
+      const screenSnapshot = await captureScreenSnapshot();
 
-      // Send message and screen snapshot via WebSocket
-      if (window.ws && window.ws.readyState === WebSocket.OPEN) {
-        console.log('[WebSocket] Sending message with screenshot:', { inputMessage, screenSnapshot });
-        window.ws.send(JSON.stringify({
-          type: 'send-message-with-screenshot',
-          message: inputMessage,
-          screenSnapshot,
-          meetingId,
-          userId: user.id || 'anonymous',
-          userName: user.name || 'User',
-          hasScreenShare: isScreenSharing
-        }));
-      } else {
-        // Fallback to HTTP if WebSocket is not available
-        const payload = {
-          message: inputMessage,
-          screenSnapshot,
-          meetingId,
-          userId: user.id || 'anonymous',
-          hasScreenShare: isScreenSharing
-        };
-        console.log('[HTTP] Sending message with screenshot:', payload);
-        const response = await fetch('http://localhost:5000/api/ai/chat-with-screenshot', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
+      // Ensure user data is available
+      const userId = user?.id || 'anonymous';
+      const userName = user?.name || 'User';
+      
+      console.log('[Frontend] Sending message with data:', {
+        message: currentMessage,
+        meetingId,
+        userId,
+        userName,
+        hasScreenShare: isScreenSharing,
+        screenSnapshot: screenSnapshot ? 'present' : 'null'
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          const aiMessage = {
-            id: Date.now(),
-            type: 'ai',
-            content: data.response,
-            timestamp: new Date()
-          };
-          
-          setMessages(prev => [...prev, aiMessage]);
-          
-          // Speak AI response if voice is enabled
-          if (isAIVoiceEnabled && data.response) {
-            speak({ text: data.response, rate: 0.9, pitch: 1.0 });
-          }
-        } else {
-          throw new Error('HTTP request failed');
-        }
-      }
+      // Send message via WebSocket
+      webSocketService.sendMessageWithScreenshot({
+        message: currentMessage,
+        screenSnapshot: screenSnapshot || null,
+        meetingId,
+        userId,
+        userName,
+        hasScreenShare: isScreenSharing
+      });
+
     } catch (error) {
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        type: 'ai',
-        content: "Sorry, I'm having trouble connecting. Please check your internet connection.",
-        timestamp: new Date()
-      }]);
-    } finally {
+      addMessage('ai', "Sorry, I'm having trouble connecting. Please check your internet connection.");
       setIsLoading(false);
     }
   };
@@ -361,17 +354,12 @@ export default function MeetingRoomPage() {
       stop();
     }
     
-    const voiceToggleMessage = {
-      id: Date.now(),
-      type: 'ai',
-      content: `🔊 AI Voice ${newVoiceState ? 'enabled' : 'disabled'}. ${newVoiceState ? 'I\'ll now respond with voice!' : 'I\'ll respond with text only.'}`,
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, voiceToggleMessage]);
+    const voiceToggleMessage = `🔊 AI Voice ${newVoiceState ? 'enabled' : 'disabled'}. ${newVoiceState ? 'I\'ll now respond with voice!' : 'I\'ll respond with text only.'}`;
+    addMessage('ai', voiceToggleMessage);
     
     // Speak the toggle message if voice is being enabled
     if (newVoiceState) {
-      speak({ text: voiceToggleMessage.content, rate: 0.9, pitch: 1.0 });
+      speak({ text: voiceToggleMessage, rate: 0.9, pitch: 1.0 });
     }
   };
 
@@ -385,12 +373,7 @@ export default function MeetingRoomPage() {
       setIsListening(true);
       
       // Add a message to indicate listening
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        type: 'ai',
-        content: "🎤 Listening... Speak your question now.",
-        timestamp: new Date()
-      }]);
+      addMessage('ai', "🎤 Listening... Speak your question now.");
     }
   };
 
@@ -398,6 +381,7 @@ export default function MeetingRoomPage() {
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());
     }
+    webSocketService.leaveMeeting(meetingId, user.id || 'anonymous', user.name || 'User');
     router.push("/dashboard");
   };
 
@@ -407,7 +391,9 @@ export default function MeetingRoomPage() {
       <div className="bg-gray-800 px-4 py-3 flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <h1 className="text-xl font-semibold">jerry Meeting</h1>
-          <span className="bg-green-500 text-xs px-2 py-1 rounded-full">Live</span>
+          <span className={`text-xs px-2 py-1 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}>
+            {isConnected ? 'Connected' : 'Disconnected'}
+          </span>
           <span className="text-sm text-gray-400">Meeting ID: {meetingId}</span>
           <span className="text-sm text-gray-400">User: {user?.name}</span>
         </div>
@@ -508,17 +494,31 @@ export default function MeetingRoomPage() {
                   message.type === 'user' 
                     ? 'bg-blue-600 ml-8' 
                     : 'bg-gray-700 mr-8'
-                }`
+                }`}
               >
                 <p className="text-sm">{message.content}</p>
                 <p className="text-xs text-gray-400 mt-1">
                   {message.timestamp.toLocaleTimeString()}
                 </p>
+                {message.type === 'ai' && (
+                  <button
+                    onClick={() => playVoice(message.content)}
+                    className="mt-2 flex items-center space-x-1 text-xs opacity-75 hover:opacity-100 transition-opacity"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                    <span>Play Voice</span>
+                  </button>
+                )}
               </div>
             ))}
             {isLoading && (
               <div className="bg-gray-700 p-3 rounded-lg mr-8">
-                <p className="text-sm">🤔 Thinking...</p>
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span className="text-sm">🤔 Thinking...</span>
+                </div>
               </div>
             )}
           </div>
@@ -553,6 +553,13 @@ export default function MeetingRoomPage() {
           </div>
         </div>
       </div>
+
+      {/* Hidden canvas for screen capture */}
+      <canvas
+        ref={canvasRef}
+        className="hidden"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 }

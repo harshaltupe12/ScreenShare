@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import dynamic from 'next/dynamic';
 
 interface Message {
   id: string;
@@ -17,10 +22,20 @@ interface AIChatProps {
   messagesEndRef: React.RefObject<HTMLDivElement>;
 }
 
+function preprocessCodeBlocks(text: string): string {
+  // Convert single-line code blocks to standard multi-line markdown code blocks
+  return text.replace(/```(\w+)[ \t]+([^\n`][^`]*)```/g, (match, lang, code) => {
+    return `\u0060\u0060\u0060${lang}\n${code.trim()}\n\u0060\u0060\u0060`;
+  });
+}
+
+const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
+
 export default function AIChat({ messages, onSendMessage, messagesEndRef }: AIChatProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -55,6 +70,17 @@ export default function AIChat({ messages, onSendMessage, messagesEndRef }: AICh
     });
   };
 
+  // Find the latest AI message
+  const latestAIMessage = [...messages].reverse().find(m => m.senderType === 'ai');
+
+  const handleCopyMarkdown = () => {
+    if (latestAIMessage) {
+      navigator.clipboard.writeText(latestAIMessage.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -62,7 +88,23 @@ export default function AIChat({ messages, onSendMessage, messagesEndRef }: AICh
         <h3 className="text-lg font-semibold">AI Assistant</h3>
         <p className="text-sm text-gray-400">Ask me anything about your screen</p>
       </div>
-      
+
+      {/* Show Markdown Editor for latest AI message only (debug) */}
+      {latestAIMessage && (
+        <div className="p-4 border-b border-gray-700 bg-gray-800">
+          <div className="flex items-center mb-2">
+            <div className="text-xs text-gray-400 flex-1">Markdown Preview (latest AI message):</div>
+            <button
+              onClick={handleCopyMarkdown}
+              className="ml-2 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <MDEditor value={latestAIMessage.content} height={200} visiableDragbar={false} preview="preview" />
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
         {messages.length === 0 ? (
@@ -97,7 +139,45 @@ export default function AIChat({ messages, onSendMessage, messagesEndRef }: AICh
                   </span>
                 </div>
                 
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <div className="text-sm">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      code({ node, inline, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || '');
+                        return !inline && match ? (
+                          <SyntaxHighlighter
+                            style={tomorrow}
+                            language={match[1]}
+                            PreTag="div"
+                            customStyle={{
+                              margin: 0,
+                              borderRadius: '8px',
+                              fontSize: '14px',
+                              lineHeight: '1.4',
+                            }}
+                            showLineNumbers
+                            {...props}
+                          >
+                            {String(children).replace(/\n$/, '')}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                    }}
+                  >
+                    {preprocessCodeBlocks(message.content)}
+                  </ReactMarkdown>
+                  {/* Show markdown editor for AI messages only */}
+                  {message.senderType === 'ai' && (
+                    <div className="mt-2">
+                      <MDEditor value={message.content} height={200} visiableDragbar={false} preview="preview" />
+                    </div>
+                  )}
+                </div>
                 
                 {message.voiceUrl && message.senderType === 'ai' && (
                   <button

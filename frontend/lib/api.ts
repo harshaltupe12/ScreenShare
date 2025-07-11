@@ -14,14 +14,22 @@ class ApiService {
   ): Promise<ApiResponse<T>> {
     try {
       const url = `${API_BASE_URL}${endpoint}`;
+      let body = options.body;
+      if (body && typeof body !== 'string') {
+        body = JSON.stringify(body);
+      }
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      };
+      console.log('[DEBUG] API Request - URL:', url);
+      console.log('[DEBUG] API Request - Headers:', headers);
+      console.log('[DEBUG] API Request - Body:', body);
       const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
         ...options,
+        headers,
+        body,
       });
-
       const data = await response.json();
 
       if (!response.ok) {
@@ -93,18 +101,29 @@ class ApiService {
     meetingId: string,
     message: string,
     screenSnapshot?: string,
+    hasScreenShare: boolean = false,
     token?: string
   ): Promise<ApiResponse> {
+    const payload = {
+      meetingId,
+      message,
+      screenSnapshot,
+      hasScreenShare,
+    };
+    
+    console.log('[DEBUG] API Service - processQuery payload:', payload);
+    console.log('[DEBUG] API Service - message type:', typeof message);
+    console.log('[DEBUG] API Service - message value:', message);
+    
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    
     return this.request('/api/ai/chat-with-screenshot', {
       method: 'POST',
-      headers: {
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-      body: JSON.stringify({
-        meetingId,
-        message,
-        screenSnapshot,
-      }),
+      headers,
+      body: JSON.stringify(payload),
     });
   }
 

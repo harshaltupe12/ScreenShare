@@ -7,6 +7,14 @@ import { UserCircleIcon, MicrophoneIcon, VideoCameraIcon, PhoneXMarkIcon, Presen
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import Webcam from 'react-webcam';
 import { webSocketService } from '../../lib/websocket';
+import { useSpeechSynthesis } from "react-speech-kit";
+
+// Utility to strip Markdown bold/italics
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
+    .replace(/\*([^*]+)\*/g, '$1'); // italics
+}
 
 interface Message {
   id: string;
@@ -43,6 +51,7 @@ export default function AIAssistantPage() {
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
   const [isWebcamOn, setIsWebcamOn] = useState(false);
+  const { speak } = useSpeechSynthesis();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -98,7 +107,13 @@ export default function AIAssistantPage() {
 
   // Modified handleSendMessage to send screen snapshot
   const handleSendMessage = async () => {
-    if (!input.trim()) return;
+    console.log('[DEBUG] handleSendMessage called with input:', input);
+    console.log('[DEBUG] input.trim():', input.trim());
+    
+    if (!input.trim()) {
+      console.log('[DEBUG] Input is empty, returning early');
+      return;
+    }
 
     const userName = user?.name || 'User';
     const userId = user?.id || 'user_' + Date.now();
@@ -109,31 +124,45 @@ export default function AIAssistantPage() {
       content: input,
       timestamp: new Date().toISOString(),
     };
+    
+    console.log('[DEBUG] userMessage:', userMessage);
     setMessages(prev => [...prev, userMessage]);
     setInput("");
 
     // Send screen snapshot if available
     const snapshot = getScreenSnapshot();
+    console.log('[DEBUG] snapshot available:', !!snapshot);
     if (snapshot) {
       webSocketService.sendScreenSnapshot(sessionId, snapshot, userId, userName);
     }
 
     try {
+      console.log('[DEBUG] Calling apiService.processQuery with:', {
+        sessionId,
+        message: userMessage.content,
+        screenSnapshot: snapshot || "",
+        hasScreenShare: isScreenSharing
+      });
+      
       const response = await apiService.processQuery(
         sessionId,
         userMessage.content,
-        ""
+        snapshot || "", // screenSnapshot - use actual snapshot if available
+        isScreenSharing // hasScreenShare
       );
       if (response.success && response.data) {
+        const aiTextRaw = response.data.response;
+        const aiText = stripMarkdown(aiTextRaw); // Clean the response
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
           sender: 'AI Assistant',
           senderType: 'ai',
-          content: response.data.response.text,
+          content: aiText,
           timestamp: new Date().toISOString(),
-          voiceUrl: response.data.response.voiceUrl,
         };
         setMessages(prev => [...prev, aiMessage]);
+        // Speak the response aloud
+        speak({ text: aiText });
       }
     } catch (error) {
       const errorMessage: Message = {
