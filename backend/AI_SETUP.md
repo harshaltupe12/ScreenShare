@@ -1,98 +1,207 @@
-# AI Service Setup Guide
+# AI Services Setup Guide
 
-This guide will help you get free API keys for real AI responses instead of dummy replies.
+This guide will help you set up all the AI services used in the jerry application.
 
-## 🚀 Quick Setup
+## Environment Variables
 
-### 1. Google Gemini API (Recommended - Free Tier)
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy the generated key
-5. Add to your `.env` file: `GEMINI_API_KEY=your_key_here`
-
-**Free Tier Limits:**
-- 15 requests per minute
-- 1,500 requests per day
-- No credit card required
-
-### 2. Hugging Face API (Optional - Free Tier)
-1. Go to [Hugging Face Tokens](https://huggingface.co/settings/tokens)
-2. Sign up or sign in
-3. Click "New token"
-4. Give it a name and select "Read" role
-5. Copy the token
-6. Add to your `.env` file: `HUGGING_FACE_API_KEY=your_token_here`
-
-**Free Tier Limits:**
-- 30,000 requests per month
-- No credit card required
-
-## 📝 Environment File Setup
-
-Create a `.env` file in the `backend` folder with:
+Create a `.env` file in the backend directory with the following variables:
 
 ```env
 # Server Configuration
 PORT=5000
-NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
 
-# Database Configuration
-MONGODB_URI=mongodb://localhost:27017/jerry
+# Database (Optional for development)
+MONGODB_URI=your_mongodb_uri_here
 
-# AI Service Configuration
+# AI Services
 GEMINI_API_KEY=your_gemini_api_key_here
-HUGGING_FACE_API_KEY=your_huggingface_token_here
+HUGGING_FACE_API_KEY=your_hugging_face_api_key_here
 
-# JWT Secret
-JWT_SECRET=your-super-secret-jwt-key
+# Text-to-Speech Services (Optional - using browser TTS by default)
+# ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
 
-# CORS Configuration
-CORS_ORIGIN=http://localhost:3000
+# Google Cloud TTS (Optional)
+GOOGLE_APPLICATION_CREDENTIALS=path/to/your/google-credentials.json
 ```
 
-## 🔧 How It Works
+## AI Service Setup
 
-The AI service tries multiple providers in this order:
-1. **Google Gemini** - Best quality, free tier
-2. **Hugging Face** - Good quality, free tier
-3. **Local AI** - Intelligent fallback, always available
+### 1. Google Gemini AI (Recommended)
 
-## ✅ Testing Your Setup
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create a new API key
+3. Add it to your `.env` file as `GEMINI_API_KEY`
 
-1. Start the backend server
-2. Check the console output for API key status
-3. Send a message in the AI chat
-4. You should see real AI responses instead of dummy replies
+**Features:**
+- Free tier available
+- High-quality responses
+- Good context understanding
+- Fast response times
 
-## 🆘 Troubleshooting
+### 2. Hugging Face (Alternative)
 
-### "No API key configured" message
-- Make sure you've added the API keys to your `.env` file
-- Restart the backend server after adding keys
-- Check that the keys are correct (no extra spaces)
+1. Go to [Hugging Face](https://huggingface.co/settings/tokens)
+2. Create a new access token
+3. Add it to your `.env` file as `HUGGING_FACE_API_KEY`
 
-### Still getting dummy responses
-- Check the backend console for error messages
-- Verify your API keys are working
-- Try the Hugging Face API as an alternative
+**Features:**
+- Free tier available
+- Multiple model options
+- Good for specific tasks
 
-### Rate limit errors
-- The free tiers have limits, but they're generous for testing
-- Wait a minute and try again
-- Consider getting both API keys for redundancy
+### 3. Browser TTS (Built-in)
 
-## 🎯 Next Steps
+The application uses `react-speech-kit` which leverages the browser's built-in speech synthesis API.
 
-Once you have real AI working:
-1. Test different types of questions
-2. Try screen sharing with AI analysis
-3. Explore the meeting features
-4. Customize the AI responses for your needs
+**Features:**
+- No API key required
+- Works offline
+- Multiple voice options available
+- Cross-browser compatibility
+- No rate limits or costs
 
-## 💡 Tips
+### 4. Google Cloud TTS (Alternative)
 
-- Start with Gemini API - it's the easiest to set up
-- Both APIs are completely free for development
-- The local AI fallback ensures the app always works
-- You can switch between APIs by commenting out keys in `.env` 
+1. Set up a Google Cloud project
+2. Enable the Text-to-Speech API
+3. Create a service account and download credentials
+4. Add the path to your `.env` file as `GOOGLE_APPLICATION_CREDENTIALS`
+
+## Installation
+
+1. Install backend dependencies:
+```bash
+cd backend
+npm install
+```
+
+2. Install frontend dependencies:
+```bash
+cd frontend
+npm install
+```
+
+## Running the Application
+
+1. Start the backend server:
+```bash
+cd backend
+npm start
+```
+
+2. Start the frontend development server:
+```bash
+cd frontend
+npm run dev
+```
+
+3. Access the application at `http://localhost:3000`
+
+## Workflow Overview
+
+The complete AI workflow is now implemented:
+
+1. **User shares screen** via WebRTC
+2. **Frontend captures screen snapshot** using canvas
+3. **Sends image via WebSocket** to backend
+4. **Backend performs OCR** using Tesseract.js
+5. **Extracted text sent to Gemini AI** for analysis
+6. **Gemini gives intelligent suggestions** based on screen content
+7. **Backend sends AI response** (text only)
+8. **Frontend generates voice** using react-speech-kit
+9. **Frontend shows chat + plays voice** using browser TTS
+
+## Features
+
+### ✅ Implemented Features
+
+- **Real-time Screen Sharing**: WebRTC with getDisplayMedia()
+- **Screen Capture**: Canvas-based snapshot capture with compression
+- **WebSocket Communication**: Socket.IO for real-time messaging
+- **OCR Processing**: Tesseract.js for text extraction
+- **AI Integration**: Multiple AI providers with fallback
+- **Voice Synthesis**: Browser TTS using react-speech-kit
+- **Voice Playback**: Built-in browser speech synthesis
+- **Speech Recognition**: Voice input for questions
+- **Real-time Chat**: Live messaging with AI assistant
+- **Connection Status**: WebSocket connection monitoring
+- **Error Handling**: Comprehensive error handling and fallbacks
+
+### 🔧 Configuration Options
+
+- **AI Provider Selection**: Automatic fallback between Gemini, Hugging Face, and local responses
+- **Voice Provider Selection**: Browser TTS using react-speech-kit
+- **Image Compression**: Automatic compression to reduce bandwidth
+- **Connection Retry**: Automatic WebSocket reconnection
+- **Voice Toggle**: Enable/disable AI voice responses
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Screen Sharing Not Working**
+   - Ensure you're using HTTPS or localhost
+   - Check browser permissions
+   - Try refreshing the page
+
+2. **AI Responses Not Working**
+   - Check API keys in `.env` file
+   - Verify internet connection
+   - Check browser console for errors
+
+3. **Voice Not Playing**
+   - Ensure audio is not muted
+   - Check browser permissions for speech synthesis
+   - Try refreshing the page
+
+4. **WebSocket Connection Issues**
+   - Check backend server is running
+   - Verify CORS settings
+   - Check firewall settings
+
+### Debug Mode
+
+Enable debug logging by setting:
+```env
+DEBUG=true
+```
+
+This will show detailed logs for:
+- WebSocket connections
+- AI API calls
+- OCR processing
+- TTS generation
+
+## Performance Optimization
+
+### Image Compression
+- Automatic compression to 1280x720 max resolution
+- JPEG quality set to 70%
+- Further compression available via WebSocket service
+
+### AI Response Caching
+- Responses are cached to reduce API calls
+- Context is preserved for better responses
+- Fallback responses ensure availability
+
+### Voice Optimization
+- Browser TTS is instant and requires no transmission
+- No audio file generation or storage needed
+- Built-in voice selection and customization
+
+## Security Considerations
+
+- API keys are stored in environment variables
+- No sensitive data is logged
+- WebSocket connections are validated
+- Input sanitization is implemented
+- CORS is properly configured
+
+## Future Enhancements
+
+- **Multi-language Support**: Add support for multiple languages
+- **Custom Voices**: Allow users to select different AI voices
+- **Meeting Recording**: Record meetings with AI transcriptions
+- **Advanced Analytics**: Track AI usage and performance
+- **Plugin System**: Allow custom AI integrations 

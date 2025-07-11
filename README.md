@@ -10,11 +10,15 @@ A real-time meeting platform with AI assistance, screen sharing, and voice synth
 - **Visual Indicators**: See who is currently sharing their screen
 - **Automatic Updates**: Screen updates every 500ms for smooth experience
 - **Participant Status**: View who is sharing in the participants list
+- **Image Compression**: Automatic compression for optimal performance
 
 ### 🤖 AI Assistant
-- **Context-Aware**: AI can see and analyze your shared screen
+- **Context-Aware**: AI can see and analyze your shared screen using OCR
 - **Real-Time Responses**: Get instant AI assistance during meetings
-- **Voice Synthesis**: AI responses can be converted to speech
+- **Multiple AI Providers**: Gemini AI, Hugging Face, and intelligent fallbacks
+- **Voice Synthesis**: Browser TTS using react-speech-kit
+- **Voice Playback**: Audio responses with error handling
+- **Speech Recognition**: Voice input for questions
 - **Meeting History**: All conversations are saved and accessible
 
 ### 👥 Meeting Management
@@ -22,6 +26,7 @@ A real-time meeting platform with AI assistance, screen sharing, and voice synth
 - **WebSocket Communication**: Instant updates across all participants
 - **Meeting Rooms**: Create and join meeting rooms with unique IDs
 - **User Authentication**: Secure access with Clerk authentication
+- **Connection Status**: Real-time WebSocket connection monitoring
 
 ## Getting Started
 
@@ -56,8 +61,15 @@ npm install
    FRONTEND_URL=http://localhost:3000
    MONGODB_URI=your_mongodb_uri
    
+   # AI Services (optional but recommended)
+   GEMINI_API_KEY=your_gemini_api_key
+   HUGGING_FACE_API_KEY=your_hugging_face_api_key
+   
    # Frontend (.env.local)
-NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
+   NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
+   ```
+   
+   **💡 Tip**: See `backend/AI_SETUP.md` for detailed setup instructions for AI services.
 ```
 
 4. **Start the servers**
@@ -86,9 +98,10 @@ NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
 
 ### AI Assistant
 1. **Share your screen** (optional but recommended)
-2. **Type your question** in the AI chat
-3. **AI will analyze your screen** and provide contextual responses
-4. **Enable voice synthesis** to hear AI responses
+2. **Type your question** in the AI chat or use voice input
+3. **AI will analyze your screen** using OCR and provide contextual responses
+4. **Enable voice synthesis** to hear AI responses with browser TTS
+5. **View extracted text** from your screen for better context
 
 ### Meeting Features
 - **Real-time participant list** with online status
@@ -107,9 +120,10 @@ NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
 
 ### Screen Sharing Implementation
 - **MediaDevices API**: Uses `getDisplayMedia()` for screen capture
-- **Canvas Capture**: Converts video frames to base64 images
+- **Canvas Capture**: Converts video frames to base64 images with compression
 - **WebSocket Broadcasting**: Sends screen data to all participants
 - **Real-time Updates**: 500ms refresh rate for smooth experience
+- **Image Optimization**: Automatic compression to 1280x720 max resolution
 
 ### Security
 - **HTTPS Required**: Screen sharing requires secure context
@@ -151,16 +165,48 @@ jerry/
 
 ### Key Components
 - **ScreenShare.tsx**: Handles screen capture and display
-- **MeetingRoom**: Main meeting interface
-- **WebSocket Service**: Real-time communication
-- **AI Service**: AI integration and processing
+- **MeetingRoom**: Main meeting interface with complete workflow
+- **WebSocket Service**: Enhanced real-time communication with callbacks
+- **AI Service**: Multi-provider AI integration with fallbacks
+- **TTS Service**: Browser TTS using react-speech-kit
+- **OCR Service**: Tesseract.js text extraction
+
+## Testing
+
+### Test the Complete Workflow
+
+1. **Run the test script** to verify all components:
+   ```bash
+   cd backend
+   node test-workflow.js
+   ```
+
+2. **Manual Testing**:
+   - Start both servers (backend and frontend)
+   - Join a meeting room
+   - Share your screen
+   - Ask the AI a question
+   - Verify voice responses work
+   - Test voice input functionality
+
+### Expected Workflow
+
+1. **User shares screen** via WebRTC ➜
+2. **Frontend captures screen snapshot** ➜
+3. **Sends image via WebSocket** ➜
+4. **Backend performs OCR** (Tesseract) ➜
+5. **Extracted text sent to Gemini AI** ➜
+6. **Gemini gives intelligent suggestions** ➜
+7. **Backend generates voice** (ElevenLabs) ➜
+8. **Sends AI response (text + audio)** ➜
+9. **Frontend shows chat + plays voice**
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
+4. Test thoroughly using the test script
 5. Submit a pull request
 
 ## License
