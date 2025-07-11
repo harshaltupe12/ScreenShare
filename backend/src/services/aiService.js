@@ -49,18 +49,20 @@ class AIService {
 
   async getGeminiResponse(query, context = '') {
     try {
-      // Skip if no API key configured
       if (aiConfig.gemini.apiKey === 'YOUR_GEMINI_API_KEY') {
         console.log('Gemini: No API key configured');
         return null;
       }
 
-      // Using Google Gemini API (free tier available)
       const prompt = context 
-        ? `Context: ${context}\n\nUser question: ${query}\n\nProvide a helpful, detailed response:`
-        : `User question: ${query}\n\nProvide a helpful, detailed response:`;
+        ? `Context: ${context}\n\nUser question: ${query}\n\nPlease answer in a short, clear, and mature way. If you provide code, always format it as a markdown code block with the language on the first line, then a newline, then the code on the following lines. For example:\n\n\`\`\`python\nprint('Hello, world!')\n\`\`\`\n\nDo not put code on the same line as the language.`
+        : `User question: ${query}\n\nPlease answer in a short, clear, and mature way. If you provide code, always format it as a markdown code block with the language on the first line, then a newline, then the code on the following lines. For example:\n\n\`\`\`python\nprint('Hello, world!')\n\`\`\`\n\nDo not put code on the same line as the language.`;
 
-      const response = await fetch(`${aiConfig.gemini.baseUrl}?key=${aiConfig.gemini.apiKey}`, {
+      const url = `${aiConfig.gemini.baseUrl}?key=${aiConfig.gemini.apiKey}`;
+      console.log('[Gemini] Sending request to:', url);
+      console.log('[Gemini] Prompt:', prompt);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,25 +75,35 @@ class AIService {
           }],
           generationConfig: {
             maxOutputTokens: 500,
-            temperature: 0.7
+            temperature: 0.5,
+            topP: 0.8,
+            topK: 40
           }
         })
       });
 
+      const data = await response.json();
+      console.log('[Gemini] Raw response:', data);
+
       if (response.ok) {
-        const data = await response.json();
         const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (aiResponse) {
+          console.log('[Gemini] Response length:', aiResponse.length);
+          console.log('[Gemini] Full response:', aiResponse);
           return {
             success: true,
             response: aiResponse,
             usage: { total_tokens: 50 }
           };
+        } else {
+          console.log('[Gemini] No AI response found in data:', data);
         }
+      } else {
+        console.log('[Gemini] Response not OK:', response.status, data);
       }
       return null;
     } catch (error) {
-      console.log('Gemini not available');
+      console.log('[Gemini] Error:', error);
       return null;
     }
   }

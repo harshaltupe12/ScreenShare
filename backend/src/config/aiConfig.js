@@ -6,7 +6,7 @@ const aiConfig = {
   gemini: {
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY || 'YOUR_GEMINI_API_KEY',
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
     instructions: `
       To get a free Gemini API key:
       1. Go to https://makersuite.google.com/app/apikey

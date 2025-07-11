@@ -17,6 +17,22 @@ router.post('/chat', chat);
 console.log('[ROUTES] Registering /chat-with-screenshot route');
 router.post('/chat-with-screenshot', chatWithScreenshot);
 
+// Debug endpoint to test request format
+router.post('/debug-request', (req, res) => {
+  console.log('[DEBUG] Request received');
+  console.log('[DEBUG] Headers:', req.headers);
+  console.log('[DEBUG] Body:', req.body);
+  console.log('[DEBUG] Body type:', typeof req.body);
+  console.log('[DEBUG] Message field:', req.body.message);
+  console.log('[DEBUG] Message type:', typeof req.body.message);
+  res.json({ 
+    success: true, 
+    received: req.body,
+    message: req.body.message,
+    messageType: typeof req.body.message
+  });
+});
+
 // All other routes require authentication
 router.use(auth);
 

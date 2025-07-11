@@ -9,7 +9,7 @@ const chat = async (req, res) => {
   try {
     const { message, meetingId, userId, hasScreenShare } = req.body;
 
-    if (!message) {
+    if (!message || message.trim() === '') {
       return res.status(400).json({ error: 'Message is required' });
     }
 
@@ -206,40 +206,62 @@ const getChatHistory = async (req, res) => {
 const chatWithScreenshot = async (req, res) => {
   try {
     console.log('[chatWithScreenshot] Controller called');
-    console.log('[chatWithScreenshot] Incoming req.body:', req.body);
+    console.log('[chatWithScreenshot] Incoming req.body keys:', Object.keys(req.body));
+    console.log('[chatWithScreenshot] req.body.message:', req.body.message);
+    console.log('[chatWithScreenshot] req.body.message type:', typeof req.body.message);
+    console.log('[chatWithScreenshot] Headers:', req.headers);
+    
     const { message, screenSnapshot, meetingId, userId, hasScreenShare } = req.body;
 
+    // More detailed validation with better error messages
     if (!message) {
-      return res.status(400).json({ error: 'Message is required' });
+      console.log('[chatWithScreenshot] Error: message is missing');
+      return res.status(400).json({ error: 'Message field is required' });
+    }
+    
+    if (typeof message !== 'string') {
+      console.log('[chatWithScreenshot] Error: message is not a string');
+      return res.status(400).json({ error: 'Message must be a string' });
+    }
+    
+    if (message.trim() === '') {
+      console.log('[chatWithScreenshot] Error: message is empty');
+      return res.status(400).json({ error: 'Message cannot be empty' });
     }
 
     let context = '';
     let ocrText = '';
 
-    // If screen snapshot is provided, run OCR
-    if (screenSnapshot && hasScreenShare) {
+    // If screen snapshot is provided and not empty, run OCR
+    if (screenSnapshot && screenSnapshot.trim() !== '' && hasScreenShare) {
       try {
+        console.log('[chatWithScreenshot] Running OCR on screen snapshot...');
         const Tesseract = require('tesseract.js');
         const result = await Tesseract.recognize(screenSnapshot, 'eng');
         ocrText = result.data.text;
-        console.log('OCR extracted text:', ocrText.substring(0, 100) + '...');
+        console.log('[chatWithScreenshot] OCR extracted text:', ocrText.substring(0, 100) + '...');
         
         // Create context from OCR text
         context = `Screen content: ${ocrText}\n\nUser question: ${message}`;
       } catch (ocrError) {
-        console.error('OCR Error:', ocrError);
+        console.error('[chatWithScreenshot] OCR Error:', ocrError);
         context = `User question: ${message}`;
       }
     } else {
+      console.log('[chatWithScreenshot] No screen snapshot provided or screen sharing not active');
       context = `User question: ${message}`;
     }
 
     // Get AI response with context
+    console.log('[chatWithScreenshot] Getting AI response with context...');
     const aiResponse = await aiService.processQuery(message, context);
 
     if (!aiResponse.success) {
+      console.error('[chatWithScreenshot] AI response failed:', aiResponse.error);
       return res.status(500).json({ error: aiResponse.error });
     }
+
+    console.log('[chatWithScreenshot] AI response received:', aiResponse.response.substring(0, 100) + '...');
 
     res.json({
       success: true,

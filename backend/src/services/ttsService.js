@@ -4,7 +4,6 @@ const path = require('path');
 
 class TTSService {
   constructor() {
-    this.client = null;
     this.isInitialized = false;
   }
 
@@ -12,10 +11,8 @@ class TTSService {
     if (this.isInitialized) return;
     
     try {
-      // For now, we'll use a simple approach without Google Cloud credentials
-      // In production, you'd set up proper Google Cloud credentials
+      console.log('TTS Service initialized - using browser speech synthesis');
       this.isInitialized = true;
-      console.log('TTS Service initialized (mock mode)');
     } catch (error) {
       console.error('TTS initialization error:', error);
       throw error;
@@ -28,15 +25,16 @@ class TTSService {
         await this.initialize();
       }
 
-      // For MVP, we'll return a mock audio URL
-      // In production, you'd use Google TTS API
-      const mockAudioUrl = `data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT`;
-      
+      // For browser-based TTS, we return a simple response
+      // The actual speech synthesis will be handled by react-speech-kit on the frontend
       return {
         success: true,
-        audioUrl: mockAudioUrl,
         text: text,
         duration: text.length * 0.06, // Rough estimate
+        provider: 'browser-tts',
+        // No audioUrl needed since frontend will handle speech synthesis
+        audioUrl: null,
+        useBrowserTTS: true
       };
     } catch (error) {
       console.error('TTS generation error:', error);
@@ -48,22 +46,16 @@ class TTSService {
     }
   }
 
+  // Legacy method for compatibility
+  async generateMockSpeech(text) {
+    return await this.generateSpeech(text);
+  }
+
   // Alternative implementation using Google TTS (requires setup)
   async generateSpeechWithGoogle(text) {
     try {
-      if (!this.client) {
-        // this.client = new TextToSpeechClient();
-        console.log('Google TTS not configured - using mock mode');
-      }
-
-      // For now, return mock response
-      const mockAudioUrl = `data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT`;
-      
-      return {
-        success: true,
-        audioUrl: mockAudioUrl,
-        text: text,
-      };
+      console.log('Google TTS not configured - using browser TTS');
+      return await this.generateSpeech(text);
     } catch (error) {
       console.error('Google TTS error:', error);
       return {
