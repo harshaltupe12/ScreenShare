@@ -8,6 +8,7 @@ import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognitio
 import Webcam from 'react-webcam';
 import { webSocketService } from '../../lib/websocket';
 import { useSpeechSynthesis } from "react-speech-kit";
+import dynamic from 'next/dynamic';
 
 // Utility to strip Markdown bold/italics
 function stripMarkdown(text: string): string {
@@ -52,6 +53,7 @@ export default function AIAssistantPage() {
   } = useSpeechRecognition();
   const [isWebcamOn, setIsWebcamOn] = useState(false);
   const { speak } = useSpeechSynthesis();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -296,6 +298,8 @@ export default function AIAssistantPage() {
   const userName = user?.name || 'User';
   // sessionId and timeString are now set in state
 
+  const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
+
   return (
     <div className="min-h-screen bg-[#2d2d2d] flex ">
       {/* Main Call Area */}
@@ -388,8 +392,33 @@ export default function AIAssistantPage() {
             )}
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.senderType === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`rounded-2xl px-4 py-2 max-w-[75%] text-sm shadow ${msg.senderType === 'user' ? 'bg-blue-600 text-white' : 'bg-[#353535] text-gray-100 border border-gray-700'}`}>
-                  {msg.content}
+                <div className={`rounded-2xl px-4 py-2 max-w-[370px] text-sm shadow ${msg.senderType === 'user' ? 'bg-blue-600 text-white' : 'bg-[#353535] text-gray-100 border border-gray-700'}`}>
+                  {msg.senderType === 'ai' ? (
+                    /```[\s\S]*?```/.test(msg.content) ? (
+                      <div style={{ width: 340, minHeight: 180, maxHeight: 300 }} className="overflow-auto">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.content);
+                            setCopiedId(msg.id);
+                            setTimeout(() => setCopiedId(null), 1500);
+                          }}
+                          className="mb-3 px-2 py-1 text-xs bg-blue-200 text-black rounded hover:bg-blue-700 transition-colors"
+                        >
+                          {copiedId === msg.id ? 'Copied!' : 'Copy'}
+                        </button>
+                        <MDEditor
+                          value={msg.content}
+                          height={180}
+                          visibleDragbar={false}
+                          preview="preview"
+                        />
+                      </div>
+                    ) : (
+                      <span>{msg.content}</span>
+                    )
+                  ) : (
+                    msg.content
+                  )}
                 </div>
               </div>
             ))}

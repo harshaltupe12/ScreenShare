@@ -4,6 +4,9 @@
   --background: #ffffff;
   --foreground: #171717;
 }
+.w-md-editor-toolbar {
+  display: none !important;
+}
 
 @theme inline {
   --color-background: var(--background);
