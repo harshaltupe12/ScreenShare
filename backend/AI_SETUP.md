@@ -1,6 +1,6 @@
 # AI Services Setup Guide
 
-This guide will help you set up all the AI services used in the jerry application.
+This guide will help you set up all the AI services and authentication used in the jerry application.
 
 ## Environment Variables
 
@@ -14,6 +14,10 @@ FRONTEND_URL=http://localhost:3000
 # Database (Optional for development)
 MONGODB_URI=your_mongodb_uri_here
 
+# Authentication (Required for production)
+JWT_SECRET=your_super_secret_jwt_key_change_in_production
+JWT_REFRESH_SECRET=your_super_secret_refresh_key_change_in_production
+
 # AI Services
 GEMINI_API_KEY=your_gemini_api_key_here
 HUGGING_FACE_API_KEY=your_hugging_face_api_key_here
@@ -24,6 +28,34 @@ HUGGING_FACE_API_KEY=your_hugging_face_api_key_here
 # Google Cloud TTS (Optional)
 GOOGLE_APPLICATION_CREDENTIALS=path/to/your/google-credentials.json
 ```
+
+## Authentication Setup
+
+### JWT Configuration
+
+The application now uses JWT (JSON Web Tokens) for secure authentication:
+
+1. **Generate secure JWT secrets**:
+   ```bash
+   # Generate a random 32-character string for JWT_SECRET
+   openssl rand -hex 32
+   
+   # Generate a random 32-character string for JWT_REFRESH_SECRET
+   openssl rand -hex 32
+   ```
+
+2. **Add the secrets to your `.env` file**:
+   ```env
+   JWT_SECRET=your_generated_jwt_secret_here
+   JWT_REFRESH_SECRET=your_generated_refresh_secret_here
+   ```
+
+**Security Notes:**
+- Never commit these secrets to version control
+- Use different secrets for development and production
+- Rotate secrets regularly in production
+- Access tokens expire in 15 minutes
+- Refresh tokens expire in 7 days
 
 ## AI Service Setup
 
@@ -98,19 +130,42 @@ npm run dev
 
 3. Access the application at `http://localhost:3000`
 
+## Authentication Features
+
+### ✅ Implemented Features
+
+- **JWT Authentication**: Secure token-based authentication
+- **Password Hashing**: bcrypt with salt rounds of 12
+- **Account Locking**: Automatic lockout after 5 failed attempts
+- **Token Refresh**: Automatic token refresh before expiry
+- **User Registration**: Complete user registration with validation
+- **User Login**: Secure login with error handling
+- **Profile Management**: Update profile information
+- **Password Change**: Secure password change functionality
+- **Session Management**: Proper session handling and cleanup
+
+### 🔧 Security Features
+
+- **Password Validation**: Minimum 6 characters required
+- **Email Validation**: Proper email format validation
+- **Account Security**: Login attempt tracking and lockout
+- **Token Security**: Short-lived access tokens (15 minutes)
+- **Refresh Tokens**: Long-lived refresh tokens (7 days)
+- **Input Sanitization**: Proper input validation and sanitization
+- **Error Handling**: Secure error messages without information leakage
+
 ## Workflow Overview
 
-The complete AI workflow is now implemented:
+The complete authentication workflow:
 
-1. **User shares screen** via WebRTC
-2. **Frontend captures screen snapshot** using canvas
-3. **Sends image via WebSocket** to backend
-4. **Backend performs OCR** using Tesseract.js
-5. **Extracted text sent to Gemini AI** for analysis
-6. **Gemini gives intelligent suggestions** based on screen content
-7. **Backend sends AI response** (text only)
-8. **Frontend generates voice** using react-speech-kit
-9. **Frontend shows chat + plays voice** using browser TTS
+1. **User registers/logs in** via secure forms
+2. **Backend validates credentials** and hashes passwords
+3. **JWT tokens generated** (access + refresh)
+4. **Frontend stores tokens** securely in localStorage
+5. **Automatic token refresh** before expiry
+6. **Protected routes** require valid tokens
+7. **User profile management** with secure updates
+8. **Secure logout** with token cleanup
 
 ## Features
 
@@ -127,6 +182,8 @@ The complete AI workflow is now implemented:
 - **Real-time Chat**: Live messaging with AI assistant
 - **Connection Status**: WebSocket connection monitoring
 - **Error Handling**: Comprehensive error handling and fallbacks
+- **JWT Authentication**: Secure token-based authentication
+- **User Management**: Complete user registration and profile management
 
 ### 🔧 Configuration Options
 
@@ -135,27 +192,34 @@ The complete AI workflow is now implemented:
 - **Image Compression**: Automatic compression to reduce bandwidth
 - **Connection Retry**: Automatic WebSocket reconnection
 - **Voice Toggle**: Enable/disable AI voice responses
+- **Authentication**: Configurable JWT secrets and token expiry
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Screen Sharing Not Working**
+1. **Authentication Errors**
+   - Check JWT secrets in `.env` file
+   - Ensure MongoDB is running (for user storage)
+   - Verify token expiry settings
+   - Check browser console for errors
+
+2. **Screen Sharing Not Working**
    - Ensure you're using HTTPS or localhost
    - Check browser permissions
    - Try refreshing the page
 
-2. **AI Responses Not Working**
+3. **AI Responses Not Working**
    - Check API keys in `.env` file
    - Verify internet connection
    - Check browser console for errors
 
-3. **Voice Not Playing**
+4. **Voice Not Playing**
    - Ensure audio is not muted
    - Check browser permissions for speech synthesis
    - Try refreshing the page
 
-4. **WebSocket Connection Issues**
+5. **WebSocket Connection Issues**
    - Check backend server is running
    - Verify CORS settings
    - Check firewall settings
@@ -168,12 +232,20 @@ DEBUG=true
 ```
 
 This will show detailed logs for:
+- Authentication events
+- JWT token operations
 - WebSocket connections
 - AI API calls
 - OCR processing
 - TTS generation
 
 ## Performance Optimization
+
+### Authentication Optimization
+- JWT tokens for stateless authentication
+- Automatic token refresh to maintain sessions
+- Efficient password hashing with bcrypt
+- Minimal database queries for authentication
 
 ### Image Compression
 - Automatic compression to 1280x720 max resolution
@@ -192,16 +264,45 @@ This will show detailed logs for:
 
 ## Security Considerations
 
-- API keys are stored in environment variables
-- No sensitive data is logged
-- WebSocket connections are validated
-- Input sanitization is implemented
-- CORS is properly configured
+- **JWT Secrets**: Stored in environment variables, never in code
+- **Password Security**: bcrypt hashing with salt rounds of 12
+- **Token Security**: Short-lived access tokens, secure refresh tokens
+- **Input Validation**: Comprehensive input sanitization
+- **Error Handling**: Secure error messages without information leakage
+- **Session Management**: Proper token cleanup on logout
+- **Account Protection**: Automatic lockout after failed attempts
+- **CORS Configuration**: Proper CORS settings for security
+- **API Security**: All sensitive endpoints require authentication
 
-## Future Enhancements
+## Production Deployment
 
-- **Multi-language Support**: Add support for multiple languages
-- **Custom Voices**: Allow users to select different AI voices
-- **Meeting Recording**: Record meetings with AI transcriptions
-- **Advanced Analytics**: Track AI usage and performance
-- **Plugin System**: Allow custom AI integrations 
+### Environment Variables for Production
+
+```env
+# Production settings
+NODE_ENV=production
+PORT=5000
+FRONTEND_URL=https://your-domain.com
+
+# Database (Required for production)
+MONGODB_URI=mongodb://your-production-mongodb-uri
+
+# Authentication (Required for production)
+JWT_SECRET=your-production-jwt-secret
+JWT_REFRESH_SECRET=your-production-refresh-secret
+
+# AI Services
+GEMINI_API_KEY=your_gemini_api_key
+HUGGING_FACE_API_KEY=your_hugging_face_api_key
+```
+
+### Security Checklist
+
+- [ ] Use strong JWT secrets (32+ characters)
+- [ ] Enable HTTPS in production
+- [ ] Set up proper CORS configuration
+- [ ] Configure MongoDB with authentication
+- [ ] Set up proper logging and monitoring
+- [ ] Regular security updates
+- [ ] Backup strategy for user data
+- [ ] Rate limiting for API endpoints 
