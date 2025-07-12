@@ -1,14 +1,21 @@
+require('dotenv').config();
+console.log('DEBUG MONGODB_URI:', process.env.MONGODB_URI);
+
+
+
+
 const express = require('express');
 const cors = require('cors');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const connectDB = require('./src/config/database');
-require('dotenv').config();
 const Tesseract = require('tesseract.js');
 
 // Import routes
 const meetingRoutes = require('./src/routes/meetings');
 const aiRoutes = require('./src/routes/ai');
+const authRoutes = require('./src/routes/auth');
+const aiSessionRoutes = require('./src/routes/aiSession');
 
 const app = express();
 const server = createServer(app);
@@ -72,8 +79,10 @@ const startServer = async () => {
     });
 
     // API Routes
+    app.use('/api/auth', authRoutes);
     app.use('/api/meetings', meetingRoutes);
     app.use('/api/ai', aiRoutes);
+    app.use('/api/ai-sessions', aiSessionRoutes);
 
     // WebSocket connection handling
     io.on('connection', (socket) => {
