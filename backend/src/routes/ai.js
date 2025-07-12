@@ -1,7 +1,7 @@
 console.log('[ROUTES] ai.js loaded');
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const {
   chat,
   chatWithScreenshot,
