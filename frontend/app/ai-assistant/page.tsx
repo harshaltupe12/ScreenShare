@@ -108,12 +108,11 @@ export default function AIAssistantPage() {
   };
 
   // Modified handleSendMessage to send screen snapshot
-  const handleSendMessage = async () => {
-    console.log('[DEBUG] handleSendMessage called with input:', input);
-    console.log('[DEBUG] input.trim():', input.trim());
-    
-    if (!input.trim()) {
-      console.log('[DEBUG] Input is empty, returning early');
+  const handleSendMessage = async (messageText?: string) => {
+    const textToSend = (messageText !== undefined ? messageText : input).trim();
+    console.log('[DEBUG] handleSendMessage called with textToSend:', textToSend);
+    if (!textToSend) {
+      console.log('[DEBUG] textToSend is empty, returning early');
       return;
     }
 
@@ -123,10 +122,9 @@ export default function AIAssistantPage() {
       id: Date.now().toString(),
       sender: userName,
       senderType: 'user',
-      content: input,
+      content: textToSend,
       timestamp: new Date().toISOString(),
     };
-    
     console.log('[DEBUG] userMessage:', userMessage);
     setMessages(prev => [...prev, userMessage]);
     setInput("");
@@ -145,7 +143,6 @@ export default function AIAssistantPage() {
         screenSnapshot: snapshot || "",
         hasScreenShare: isScreenSharing
       });
-      
       const response = await apiService.processQuery(
         sessionId,
         userMessage.content,
@@ -233,18 +230,19 @@ export default function AIAssistantPage() {
   // When transcript changes, start/reset a 6s timer
   useEffect(() => {
     if (isListening) {
-      setInput(transcript);
       if (pauseTimer) clearTimeout(pauseTimer);
       if (transcript.trim() && transcript !== lastTranscript) {
         setLastTranscript(transcript);
         const timer = setTimeout(() => {
           if (transcript.trim()) {
-            setInput(transcript);
-            handleSendMessage();
-            resetTranscript();
-            setLastTranscript("");
+            handleSendMessage(transcript);
+            // Wait a bit before resetting to let browser finalize last word
+            setTimeout(() => {
+              resetTranscript();
+              setLastTranscript("");
+            }, 200);
           }
-        }, 6000);
+        }, 3000); // 3 seconds pause
         setPauseTimer(timer);
       }
     }
