@@ -102,6 +102,8 @@ class ApiService {
     message: string,
     screenSnapshot?: string,
     hasScreenShare: boolean = false,
+    sessionId?: string,
+    userId?: string,
     token?: string
   ): Promise<ApiResponse> {
     const payload = {
@@ -109,6 +111,8 @@ class ApiService {
       message,
       screenSnapshot,
       hasScreenShare,
+      sessionId,
+      userId,
     };
     
     console.log('[DEBUG] API Service - processQuery payload:', payload);

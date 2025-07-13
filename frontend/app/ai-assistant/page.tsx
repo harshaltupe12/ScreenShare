@@ -147,7 +147,9 @@ export default function AIAssistantPage() {
         sessionId,
         userMessage.content,
         snapshot || "", // screenSnapshot - use actual snapshot if available
-        isScreenSharing // hasScreenShare
+        isScreenSharing, // hasScreenShare
+        sessionId, // sessionId for context
+        userId // userId for context
       );
       if (response.success && response.data) {
         const aiTextRaw = response.data.response;

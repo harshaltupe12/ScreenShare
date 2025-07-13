@@ -1,5 +1,6 @@
 // Real AI service using free alternatives - no mock responses
 const aiConfig = require('../config/aiConfig');
+const AISessionService = require('./aiSessionService');
 
 class AIService {
   constructor() {
@@ -15,13 +16,130 @@ class AIService {
     console.log('================================\n');
   }
 
-  async processQuery(query, context = '') {
+  async processQuery(query, context = '', sessionId = null, userId = null) {
     try {
+      let summary = '';
+      let recentHistory = '';
+      let entityContext = '';
+      let reconstructedQuery = null;
+      const RECENT_TURNS = 8;
+      const SUMMARY_TRIGGER = 20;
+
+      let lastUserMsg = null;
+      let lastAIMsg = null;
+
+      if (sessionId && userId) {
+        // Get session summary
+        try {
+          const summaryResult = await AISessionService.getSessionSummary(sessionId, userId);
+          if (summaryResult.success && summaryResult.summary) {
+            summary = summaryResult.summary;
+          }
+        } catch (error) {
+          console.log('[AI Service] Could not retrieve session summary:', error.message);
+        }
+
+        // Get recent N messages
+        try {
+          const historyResult = await AISessionService.getSessionHistory(sessionId, userId, RECENT_TURNS);
+          if (historyResult.success && historyResult.messages.length > 0) {
+            recentHistory = this.formatConversationHistory(historyResult.messages);
+            // For follow-up reconstruction
+            const msgs = historyResult.messages;
+            lastUserMsg = [...msgs].reverse().find(m => m.senderType === 'user');
+            lastAIMsg = [...msgs].reverse().find(m => m.senderType === 'ai');
+            console.log('[AI Service] Using recent conversation for context');
+          }
+        } catch (error) {
+          console.log('[AI Service] Could not retrieve conversation history:', error.message);
+        }
+
+        // If message count exceeds threshold, summarize and store
+        try {
+          const historyResult = await AISessionService.getSessionHistory(sessionId, userId, SUMMARY_TRIGGER + 1);
+          if (historyResult.success && historyResult.messages.length > SUMMARY_TRIGGER) {
+            const allMessages = historyResult.messages;
+            const toSummarize = allMessages.slice(0, allMessages.length - RECENT_TURNS);
+            const summaryText = this.summarizeMessages(toSummarize);
+            await AISessionService.updateSessionSummary(sessionId, userId, summaryText);
+            summary = summaryText;
+            console.log('[AI Service] Session summary updated.');
+          }
+        } catch (error) {
+          console.log('[AI Service] Could not update session summary:', error.message);
+        }
+
+        // Entity/intent extraction and context
+        try {
+          const entityResult = await AISessionService.updateSessionEntitiesAndIntent(sessionId, userId, query);
+          if (entityResult.success) {
+            const { entities, intent } = entityResult;
+            let entityParts = [];
+            if (entities.country) entityParts.push(`country=${entities.country}`);
+            if (entities.person) entityParts.push(`person=${entities.person}`);
+            if (entities.topic) entityParts.push(`topic=${entities.topic}`);
+            if (intent && intent !== 'unknown') entityParts.push(`intent=${intent}`);
+            if (entityParts.length > 0) {
+              entityContext = `Known entities/intents: ${entityParts.join(', ')}\n\n`;
+            }
+          }
+        } catch (error) {
+          console.log('[AI Service] Could not extract entities/intent:', error.message);
+        }
+
+        // --- Smart follow-up reconstruction logic ---
+        // If the current user message is a fragment (e.g., just a country), and the last user message was a question needing that entity, reconstruct the full query
+        if (lastUserMsg && lastAIMsg) {
+          const isFragment = query.trim().split(/\s+/).length <= 3 && /^[A-Za-z\s]+$/.test(query.trim());
+          const aiAskedForClarification = /specify|which|more information|clarify|country|context|about/i.test(lastAIMsg.content);
+          if (isFragment && aiAskedForClarification) {
+            // Try to reconstruct
+            reconstructedQuery = lastUserMsg.content.trim();
+            if (!reconstructedQuery.endsWith('?')) reconstructedQuery += ' ';
+            reconstructedQuery += query.trim();
+            if (!reconstructedQuery.endsWith('?')) reconstructedQuery += '?';
+            console.log('[AI Service] Reconstructed query:', reconstructedQuery);
+          }
+        }
+      }
+
+      // Build context: summary + recent turns + entity context + current context
+      let fullContext = '';
+      // Always include entities/intents section, even if empty
+      fullContext += '---\n';
+      fullContext += 'Entities and Intent:\n';
+      if (entityContext) {
+        fullContext += entityContext;
+      } else {
+        fullContext += 'None detected\n\n';
+      }
+      fullContext += '---\n';
+      if (summary) {
+        fullContext += `Conversation summary: ${summary}\n\n`;
+      }
+      if (recentHistory) {
+        fullContext += `Recent conversation:\n${recentHistory}\n`;
+      }
+      if (context) {
+        fullContext += `Current context: ${context}\n\n`;
+      }
+
+      // Use reconstructed query if available
+      const finalQuery = reconstructedQuery || query;
+
+      // Hard merge: if using reconstructed query, send only the merged question and minimal context
+      let promptForAI = '';
+      if (reconstructedQuery) {
+        promptForAI = `User's intended question: ${reconstructedQuery}\nPlease answer this question directly.`;
+      } else {
+        promptForAI = fullContext;
+      }
+
       // Try multiple free AI APIs in sequence
       const responses = [
-        await this.getGeminiResponse(query, context),
-        await this.getHuggingFaceResponse(query, context),
-        await this.getLocalAIMockResponse(query, context) // Only as last resort
+        await this.getGeminiResponse(finalQuery, promptForAI),
+        await this.getHuggingFaceResponse(finalQuery, promptForAI),
+        await this.getLocalAIMockResponse(finalQuery, promptForAI) // Only as last resort
       ];
 
       // Return the first successful response
@@ -34,7 +152,7 @@ class AIService {
       // If all fail, return a simple response
       return {
         success: true,
-        response: `I understand you're asking about: "${query}". Let me help you with that. What specific aspect would you like me to focus on?`,
+        response: `I understand you're asking about: "${finalQuery}". Let me help you with that. What specific aspect would you like me to focus on?`,
         usage: { total_tokens: 30 }
       };
     } catch (error) {
@@ -47,6 +165,31 @@ class AIService {
     }
   }
 
+  formatConversationHistory(messages) {
+    if (!messages || messages.length === 0) return '';
+    
+    const formattedHistory = messages.map(msg => {
+      const sender = msg.senderType === 'user' ? 'User' : 'AI Assistant';
+      return `${sender}: ${msg.content}`;
+    }).join('\n');
+    
+    return `Previous conversation:\n${formattedHistory}\n\n`;
+  }
+
+  buildFullContext(context, conversationHistory) {
+    let fullContext = '';
+    
+    if (conversationHistory) {
+      fullContext += conversationHistory;
+    }
+    
+    if (context) {
+      fullContext += `Current context: ${context}\n\n`;
+    }
+    
+    return fullContext;
+  }
+
   async getGeminiResponse(query, context = '') {
     try {
       if (aiConfig.gemini.apiKey === 'YOUR_GEMINI_API_KEY') {
@@ -55,7 +198,7 @@ class AIService {
       }
 
       const prompt = context 
-        ? `Context: ${context}\n\nUser question: ${query}\n\nPlease answer in a short, clear, and mature way. If you provide code, always format it as a markdown code block with the language on the first line, then a newline, then the code on the following lines. For example:\n\n\`\`\`python\nprint('Hello, world!')\n\`\`\`\n\nDo not put code on the same line as the language.`
+        ? `${context}User question: ${query}\n\nPlease answer in a short, clear, and mature way. If you provide code, always format it as a markdown code block with the language on the first line, then a newline, then the code on the following lines. For example:\n\n\`\`\`python\nprint('Hello, world!')\n\`\`\`\n\nDo not put code on the same line as the language.`
         : `User question: ${query}\n\nPlease answer in a short, clear, and mature way. If you provide code, always format it as a markdown code block with the language on the first line, then a newline, then the code on the following lines. For example:\n\n\`\`\`python\nprint('Hello, world!')\n\`\`\`\n\nDo not put code on the same line as the language.`;
 
       const url = `${aiConfig.gemini.baseUrl}?key=${aiConfig.gemini.apiKey}`;
@@ -112,7 +255,7 @@ class AIService {
     try {
       // Using Hugging Face Inference API with a better model
       const prompt = context 
-        ? `Context: ${context}\n\nQuestion: ${query}\n\nAnswer:`
+        ? `${context}Question: ${query}\n\nAnswer:`
         : `Question: ${query}\n\nAnswer:`;
 
       const headers = {
@@ -359,6 +502,19 @@ class AIService {
         usage: { total_tokens: 30 }
       };
     }
+  }
+
+  summarizeMessages(messages) {
+    if (!messages || messages.length === 0) return '';
+    // Simple summarization: concatenate user and AI turns, truncate if too long
+    let summary = messages.map(msg => {
+      const sender = msg.senderType === 'user' ? 'User' : 'AI';
+      return `${sender}: ${msg.content}`;
+    }).join(' ');
+    if (summary.length > 800) {
+      summary = summary.slice(0, 800) + '...';
+    }
+    return summary;
   }
 }
 

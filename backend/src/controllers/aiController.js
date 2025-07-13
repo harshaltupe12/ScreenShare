@@ -3,11 +3,12 @@ const ocrService = require('../services/ocrService');
 const ttsService = require('../services/ttsService');
 const Message = require('../models/Message');
 const Meeting = require('../models/Meeting');
+const AISessionService = require('../services/aiSessionService');
 
 // Simple chat endpoint for frontend (no auth required)
 const chat = async (req, res) => {
   try {
-    const { message, meetingId, userId, hasScreenShare } = req.body;
+    const { message, meetingId, userId, hasScreenShare, sessionId } = req.body;
 
     if (!message || message.trim() === '') {
       return res.status(400).json({ error: 'Message is required' });
@@ -19,8 +20,8 @@ const chat = async (req, res) => {
       context = 'User is sharing their screen. Provide contextual help based on what they might be working on.';
     }
 
-    // Get AI response
-    const aiResponse = await aiService.processQuery(message, context);
+    // Get AI response with session context
+    const aiResponse = await aiService.processQuery(message, context, sessionId, userId);
 
     if (!aiResponse.success) {
       return res.status(500).json({ error: aiResponse.error });
@@ -40,7 +41,7 @@ const chat = async (req, res) => {
 // Process user query and get AI response
 const processQuery = async (req, res) => {
   try {
-    const { meetingId, query, screenData } = req.body;
+    const { meetingId, query, screenData, sessionId } = req.body;
     const { userId } = req.user;
 
     // Find the meeting
@@ -62,8 +63,8 @@ const processQuery = async (req, res) => {
       }
     }
 
-    // Get AI response
-    const aiResponse = await aiService.processQuery(query, context);
+    // Get AI response with session context
+    const aiResponse = await aiService.processQuery(query, context, sessionId, userId);
 
     if (!aiResponse.success) {
       return res.status(500).json({ error: aiResponse.error });
@@ -211,7 +212,7 @@ const chatWithScreenshot = async (req, res) => {
     console.log('[chatWithScreenshot] req.body.message type:', typeof req.body.message);
     console.log('[chatWithScreenshot] Headers:', req.headers);
     
-    const { message, screenSnapshot, meetingId, userId, hasScreenShare } = req.body;
+    const { message, screenSnapshot, meetingId, userId, hasScreenShare, sessionId } = req.body;
 
     // More detailed validation with better error messages
     if (!message) {
@@ -252,9 +253,9 @@ const chatWithScreenshot = async (req, res) => {
       context = `User question: ${message}`;
     }
 
-    // Get AI response with context
+    // Get AI response with context and session history
     console.log('[chatWithScreenshot] Getting AI response with context...');
-    const aiResponse = await aiService.processQuery(message, context);
+    const aiResponse = await aiService.processQuery(message, context, sessionId, userId);
 
     if (!aiResponse.success) {
       console.error('[chatWithScreenshot] AI response failed:', aiResponse.error);
@@ -262,6 +263,39 @@ const chatWithScreenshot = async (req, res) => {
     }
 
     console.log('[chatWithScreenshot] AI response received:', aiResponse.response.substring(0, 100) + '...');
+
+    // Save messages to session if sessionId is provided
+    if (sessionId && userId) {
+      try {
+        // Save user message
+        await AISessionService.saveMessage(sessionId, userId, {
+          senderType: 'user',
+          content: message,
+          messageType: 'text',
+          metadata: {
+            screenSnapshot: screenSnapshot || null,
+            context: context || null,
+            ocrText: ocrText || null,
+          }
+        });
+
+        // Save AI response
+        await AISessionService.saveMessage(sessionId, userId, {
+          senderType: 'ai',
+          content: aiResponse.response,
+          messageType: 'text',
+          metadata: {
+            context: context || null,
+            ocrText: ocrText || null,
+          }
+        });
+
+        console.log('[chatWithScreenshot] Messages saved to session:', sessionId);
+      } catch (saveError) {
+        console.error('[chatWithScreenshot] Error saving messages to session:', saveError);
+        // Continue without saving - don't fail the request
+      }
+    }
 
     res.json({
       success: true,

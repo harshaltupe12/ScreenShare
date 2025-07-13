@@ -43,6 +43,10 @@ const aiSessionSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  summary: {
+    type: String,
+    default: ''
+  },
   metadata: {
     userAgent: String,
     ipAddress: String,

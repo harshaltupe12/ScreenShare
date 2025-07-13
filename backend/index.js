@@ -209,8 +209,8 @@ const startServer = async () => {
       });
 
       socket.on('send-message-with-screenshot', async (data) => {
-        const { message, screenSnapshot, meetingId, userId, userName, hasScreenShare } = data;
-        console.log('[WebSocket] Message with screenshot received:', { userName, userId, meetingId, hasScreenShare });
+        const { message, screenSnapshot, meetingId, userId, userName, hasScreenShare, sessionId } = data;
+        console.log('[WebSocket] Message with screenshot received:', { userName, userId, meetingId, hasScreenShare, sessionId });
         console.log('[WebSocket] Message:', message);
         
         try {
@@ -234,9 +234,9 @@ const startServer = async () => {
             context = `User question: ${message}`;
           }
 
-          // Get AI response with context
+          // Get AI response with context and session history
           const aiService = require('./src/services/aiService');
-          const aiResponse = await aiService.processQuery(message, context);
+          const aiResponse = await aiService.processQuery(message, context, sessionId, userId);
 
           if (!aiResponse.success) {
             throw new Error(aiResponse.error);
@@ -244,6 +244,41 @@ const startServer = async () => {
 
           // Print the AI answer to the console
           console.log('[WebSocket] AI Answer:', aiResponse.response);
+
+          // Save messages to session if sessionId is provided
+          if (sessionId && userId) {
+            try {
+              const AISessionService = require('./src/services/aiSessionService');
+              
+              // Save user message
+              await AISessionService.saveMessage(sessionId, userId, {
+                senderType: 'user',
+                content: message,
+                messageType: 'text',
+                metadata: {
+                  screenSnapshot: screenSnapshot || null,
+                  context: context || null,
+                  ocrText: ocrText || null,
+                }
+              });
+
+              // Save AI response
+              await AISessionService.saveMessage(sessionId, userId, {
+                senderType: 'ai',
+                content: aiResponse.response,
+                messageType: 'text',
+                metadata: {
+                  context: context || null,
+                  ocrText: ocrText || null,
+                }
+              });
+
+              console.log('[WebSocket] Messages saved to session:', sessionId);
+            } catch (saveError) {
+              console.error('[WebSocket] Error saving messages to session:', saveError);
+              // Continue without saving - don't fail the request
+            }
+          }
 
           // Emit AI response event back to the client
           // Voice will be handled by react-speech-kit on the frontend

@@ -139,6 +139,7 @@ class WebSocketService {
     userId: string;
     userName: string;
     hasScreenShare: boolean;
+    sessionId?: string;
   }) {
     if (this.socket) {
       console.log('[WebSocket] Sending message with screenshot:', {
@@ -147,6 +148,7 @@ class WebSocketService {
         meetingId: data.meetingId,
         userId: data.userId,
         userName: data.userName,
+        sessionId: data.sessionId,
         screenSnapshot: data.screenSnapshot ? 'present' : 'null'
       });
       
@@ -157,7 +159,8 @@ class WebSocketService {
         meetingId: data.meetingId,
         userId: data.userId,
         userName: data.userName,
-        hasScreenShare: data.hasScreenShare
+        hasScreenShare: data.hasScreenShare,
+        sessionId: data.sessionId
       };
       
       console.log('[WebSocket] Final payload:', payload);

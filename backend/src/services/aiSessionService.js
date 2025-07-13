@@ -1,6 +1,7 @@
 const AISession = require('../models/AISession');
 const Message = require('../models/Message');
 const User = require('../models/User');
+const nlp = require('compromise');
 
 class AISessionService {
   // Create a new AI session
@@ -172,6 +173,36 @@ class AISessionService {
     }
   }
 
+  // Update session summary
+  static async updateSessionSummary(sessionId, userId, summary) {
+    try {
+      const session = await AISession.findOne({ sessionId, userId });
+      if (!session) {
+        throw new Error('Session not found');
+      }
+      session.summary = summary;
+      await session.save();
+      return { success: true, session };
+    } catch (error) {
+      console.error('Error updating session summary:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get session summary
+  static async getSessionSummary(sessionId, userId) {
+    try {
+      const session = await AISession.findOne({ sessionId, userId });
+      if (!session) {
+        throw new Error('Session not found');
+      }
+      return { success: true, summary: session.summary || '' };
+    } catch (error) {
+      console.error('Error getting session summary:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Clean up old sessions (for maintenance)
   static async cleanupOldSessions(daysOld = 30) {
     try {
@@ -186,6 +217,51 @@ class AISessionService {
       return { success: true, deletedCount: result.deletedCount };
     } catch (error) {
       console.error('Error cleaning up old sessions:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Extract entities and intent from a message
+  static extractEntitiesAndIntent(message) {
+    const doc = nlp(message);
+    const entities = {};
+    // Extract country names
+    const countries = doc.match('#Country').out('array');
+    if (countries.length > 0) entities.country = countries[countries.length - 1];
+    // Extract person names
+    const people = doc.people().out('array');
+    if (people.length > 0) entities.person = people[people.length - 1];
+    // Extract topics (nouns)
+    const topics = doc.nouns().out('array');
+    if (topics.length > 0) entities.topic = topics[topics.length - 1];
+    // Simple intent detection
+    let intent = 'unknown';
+    if (/who\s+is|what\s+is|tell\s+me|define|explain/i.test(message)) intent = 'ask_info';
+    else if (/help|assist|how\s+do|can\s+you/i.test(message)) intent = 'request_help';
+    else if (/where\s+is|location|find/i.test(message)) intent = 'ask_location';
+    else if (/when\s+is|date|time/i.test(message)) intent = 'ask_time';
+    else if (/why|reason/i.test(message)) intent = 'ask_reason';
+    return { entities, intent };
+  }
+
+  // Update session metadata with new entities/intents
+  static async updateSessionEntitiesAndIntent(sessionId, userId, message) {
+    try {
+      const session = await AISession.findOne({ sessionId, userId });
+      if (!session) throw new Error('Session not found');
+      const { entities, intent } = this.extractEntitiesAndIntent(message);
+      // Merge new entities into topics
+      if (entities.topic) {
+        session.metadata.topics = Array.from(new Set([...(session.metadata.topics || []), entities.topic]));
+      }
+      // Store latest country/person/intent
+      if (entities.country) session.metadata.country = entities.country;
+      if (entities.person) session.metadata.person = entities.person;
+      session.metadata.lastIntent = intent;
+      await session.save();
+      return { success: true, session, entities, intent };
+    } catch (error) {
+      console.error('Error updating session entities/intent:', error);
       return { success: false, error: error.message };
     }
   }
