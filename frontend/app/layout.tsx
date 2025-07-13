@@ -1,23 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import {
-  UserCircleIcon,
-  MicrophoneIcon,
-  VideoCameraIcon,
-  ShareIcon,
-  FaceSmileIcon,
-  ChatBubbleLeftRightIcon,
-  HandRaisedIcon,
-  EllipsisHorizontalIcon,
-  PhoneXMarkIcon,
-  ArrowsPointingOutIcon,
-} from "@heroicons/react/24/outline";
+import ConditionalNavbar from "@/components/layout/ConditionalNavbar";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "jerry - AI Meeting Assistant",
+  title: "ScreenShare.AI - AI Meeting Assistant",
   description:
     "AI-powered real-time meeting assistant with screen sharing and voice interaction",
 };
@@ -29,7 +18,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className} suppressHydrationWarning={true}>{children}</body>
+      <body className={inter.className} suppressHydrationWarning={true}>
+        <ConditionalNavbar />
+        <main>
+          {children}
+        </main>
+      </body>
     </html>
   );
 }

@@ -144,12 +144,12 @@ export default function AuthPage() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            {isSignIn ? 'Sign in to jerry' : 'Create your jerry account'}
+            {isSignIn ? 'Sign in to ScreenShare.AI' : 'Create your ScreenShare.AI account'}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             {isSignIn 
               ? 'Welcome back to your AI meeting assistant' 
-              : 'Join jerry for AI-powered meetings and screen sharing'
+              : 'Join ScreenShare.AI for AI-powered meetings and screen sharing'
             }
           </p>
         </div>
@@ -312,7 +312,7 @@ export default function AuthPage() {
 
         {/* Features preview */}
         <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">What you'll get with jerry:</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">What you'll get with ScreenShare.AI:</h3>
           <div className="space-y-3">
             <div className="flex items-center">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>

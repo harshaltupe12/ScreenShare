@@ -9,6 +9,7 @@ import Webcam from 'react-webcam';
 import { webSocketService } from '../../lib/websocket';
 import { useSpeechSynthesis } from "react-speech-kit";
 import dynamic from 'next/dynamic';
+import { authService } from '../../lib/auth';
 
 // Utility to strip Markdown bold/italics
 function stripMarkdown(text: string): string {
@@ -58,21 +59,17 @@ export default function AIAssistantPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Only run on client
-    if (typeof window !== 'undefined') {
-      // User
-      const userData = localStorage.getItem('jerry_user');
-      if (userData) {
-        const user = JSON.parse(userData);
-        if (user.isAuthenticated) {
-          setIsAuthenticated(true);
-          setUser(user);
-        } else {
-          router.push('/auth/simple');
-          return;
-        }
+    const checkAuth = async () => {
+      if (!authService.isAuthenticated()) {
+        router.push('/auth');
+        return;
+      }
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
       } else {
-        router.push('/auth/simple');
+        router.push('/auth');
         return;
       }
       // Time string
@@ -84,7 +81,9 @@ export default function AIAssistantPage() {
       }
       setIsClientReady(true);
       setIsLoading(false);
-    }
+    };
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

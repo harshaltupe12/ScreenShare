@@ -99,16 +99,20 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-[#121010] to-[#080707]">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Welcome to jerry, {user.name || 'User'}!
+            <div className="flex items-center justify-center mb-4">
+              <h1 className="text-5xl font-bold text-white">
+                Welcome to ScreenShare.AI, {" "}
+                <span className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-700 bg-clip-text text-transparent">
+                  {user.name || 'User'}
+                </span>
+                !
               </h1>
-              <div className="flex items-center space-x-4">
+              {/* <div className="flex items-center space-x-4">
                 <Link
                   href="/profile"
                   className="text-sm text-blue-600 hover:text-blue-500"
@@ -122,28 +126,28 @@ export default function DashboardPage() {
                 >
                   {isLoggingOut ? 'Signing out...' : 'Sign Out'}
                 </button>
-              </div>
+              </div> */}
             </div>
-            <p className="text-gray-600">
+            <p className="text-slate-200">
               Your personal AI assistant with screen sharing capabilities
             </p>
           </div>
 
           <div className="max-w-4xl mx-auto">
             {/* User Info Card */}
-            <div className="bg-white overflow-hidden shadow rounded-lg mb-8">
+            <div className="bg-black rounded-lg shadow-lg mb-8 border border-white/60">
               <div className="px-4 py-5 sm:p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center">
                       <span className="text-white font-semibold text-lg">
                         {user.firstName?.charAt(0) || ''}{user.lastName?.charAt(0) || ''}
                       </span>
                     </div>
                   </div>
                   <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">{user.name || 'User'}</h3>
-                    <p className="text-sm text-gray-500">{user.email || 'No email'}</p>
+                    <h3 className="text-lg font-medium text-white">{user.name || 'User'}</h3>
+                    <p className="text-sm text-gray-300">{user.email || 'No email'}</p>
                     <p className="text-xs text-gray-400">
                       Member since {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                     </p>
@@ -153,24 +157,24 @@ export default function DashboardPage() {
             </div>
 
             {/* AI Assistant Card */}
-            <div className="bg-white overflow-hidden shadow rounded-lg mb-8">
+            <div className="bg-black rounded-lg shadow-lg mb-8 border border-white/60">
               <div className="px-4 py-5 sm:p-6">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-orange-400 via-yellow-500 to-red-500 rounded-lg flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">
+                  <h3 className="text-xl font-medium text-white mb-2">
                     Start AI Assistant
                   </h3>
-                  <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
+                  <p className="text-sm text-gray-300 mb-6 max-w-md mx-auto">
                     Share your screen and get instant AI assistance. Ask questions, get help with coding, 
                     design feedback, or any other task. The AI can see your screen and provide contextual responses.
                   </p>
                   <Link
                     href="/ai-assistant"
-                    className="inline-flex items-center px-8 py-3 border border-transparent text-lg font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-8 py-3 border border-white/60 text-lg font-medium rounded-md text-white bg-[#120d0d] hover:bg-[#1a1515] transition-colors"
                   >
                     Start AI Assistant
                   </Link>
@@ -179,38 +183,38 @@ export default function DashboardPage() {
             </div>
 
             {/* Features Info */}
-            <div className="bg-white shadow rounded-lg">
+            <div className="bg-black shadow-lg rounded-lg border border-white/60">
               <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  What you can do with jerry:
+                <h3 className="text-lg font-medium text-white mb-4">
+                  What you can do with ScreenShare.AI:
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                      <span className="text-sm text-gray-600">Share your screen for AI analysis</span>
+                      <span className="text-sm text-gray-300">Share your screen for AI analysis</span>
                     </div>
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                      <span className="text-sm text-gray-600">Get real-time AI chat assistance</span>
+                      <span className="text-sm text-gray-300">Get real-time AI chat assistance</span>
                     </div>
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                      <span className="text-sm text-gray-600">Voice synthesis for AI responses</span>
+                      <span className="text-sm text-gray-300">Voice synthesis for AI responses</span>
                     </div>
                   </div>
                   <div className="space-y-3">
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                      <span className="text-sm text-gray-600">Context-aware AI responses</span>
+                      <span className="text-sm text-gray-300">Context-aware AI responses</span>
                     </div>
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                      <span className="text-sm text-gray-600">Secure JWT authentication</span>
+                      <span className="text-sm text-gray-300">Secure JWT authentication</span>
                     </div>
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                      <span className="text-sm text-gray-600">Voice input for questions</span>
+                      <span className="text-sm text-gray-300">Voice input for questions</span>
                     </div>
                   </div>
                 </div>

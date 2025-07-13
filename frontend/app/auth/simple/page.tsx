@@ -16,7 +16,7 @@ export default function SimpleAuthPage() {
     // Simple authentication - just store in localStorage
     if (isSignIn) {
       // Sign in
-      localStorage.setItem('jerry_user', JSON.stringify({
+      localStorage.setItem('screenshare_ai_user', JSON.stringify({
         id: 'user_' + Date.now(),
         email,
         name: email.split('@')[0],
@@ -24,7 +24,7 @@ export default function SimpleAuthPage() {
       }));
     } else {
       // Sign up
-      localStorage.setItem('jerry_user', JSON.stringify({
+      localStorage.setItem('screenshare_ai_user', JSON.stringify({
         id: 'user_' + Date.now(),
         email,
         name: name || email.split('@')[0],
@@ -41,10 +41,10 @@ export default function SimpleAuthPage() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            {isSignIn ? 'Sign in to jerry' : 'Create your jerry account'}
+            {isSignIn ? 'Sign in to ScreenShare.AI' : 'Create your ScreenShare.AI account'}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            {isSignIn ? 'Welcome back to your AI meeting assistant' : 'Join jerry for AI-powered meetings'}
+            {isSignIn ? 'Welcome back to your AI meeting assistant' : 'Join ScreenShare.AI for AI-powered meetings'}
           </p>
         </div>
         

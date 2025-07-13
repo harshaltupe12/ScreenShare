@@ -63,8 +63,8 @@ class AuthService {
     if (typeof window === 'undefined') return;
 
     try {
-      const storedTokens = localStorage.getItem('jerry_tokens');
-      const storedUser = localStorage.getItem('jerry_user');
+      const storedTokens = localStorage.getItem('screenshare_ai_tokens');
+      const storedUser = localStorage.getItem('screenshare_ai_user');
 
       if (storedTokens) {
         const tokens = JSON.parse(storedTokens);
@@ -86,7 +86,7 @@ class AuthService {
     if (typeof window === 'undefined') return;
 
     try {
-      localStorage.setItem('jerry_tokens', JSON.stringify(tokens));
+      localStorage.setItem('screenshare_ai_tokens', JSON.stringify(tokens));
       this.accessToken = tokens.accessToken;
       this.refreshToken = tokens.refreshToken;
     } catch (error) {
@@ -99,7 +99,7 @@ class AuthService {
     if (typeof window === 'undefined') return;
 
     try {
-      localStorage.setItem('jerry_user', JSON.stringify(user));
+      localStorage.setItem('screenshare_ai_user', JSON.stringify(user));
       this.user = user;
     } catch (error) {
       console.error('Error saving user to storage:', error);
@@ -110,8 +110,8 @@ class AuthService {
   private clearAuth(): void {
     if (typeof window === 'undefined') return;
 
-    localStorage.removeItem('jerry_tokens');
-    localStorage.removeItem('jerry_user');
+    localStorage.removeItem('screenshare_ai_tokens');
+    localStorage.removeItem('screenshare_ai_user');
     this.accessToken = null;
     this.refreshToken = null;
     this.user = null;
@@ -379,7 +379,7 @@ class AuthService {
   }
 
   // Update user profile
-  async updateProfile(profileData: Partial<User>): Promise<ApiResponse<{ user: User; message: string }>> {
+  async updateProfile(profileData: Partial<User>): Promise<ApiResponse<{ user: User }>> {
     return this.makeAuthenticatedRequest('/api/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData)
@@ -387,10 +387,13 @@ class AuthService {
   }
 
   // Change password
-  async changePassword(passwords: { currentPassword: string; newPassword: string }): Promise<ApiResponse<{ message: string }>> {
+  async changePassword(passwordData: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<ApiResponse<{ message: string }>> {
     return this.makeAuthenticatedRequest('/api/auth/change-password', {
-      method: 'PUT',
-      body: JSON.stringify(passwords)
+      method: 'POST',
+      body: JSON.stringify(passwordData)
     });
   }
 
@@ -414,11 +417,6 @@ class AuthService {
   // Get current user
   getCurrentUser(): User | null {
     return this.user;
-  }
-
-  // Get access token
-  getAccessToken(): string | null {
-    return this.accessToken;
   }
 
   // Check if token is expired
