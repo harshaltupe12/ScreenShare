@@ -53,7 +53,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-semibold text-white mb-2">Screen Sharing</h3>
               <p className="text-gray-300">
-                Share your screen securely and let AI analyze what you're working on in real-time.
+                Share your screen securely and let AI analyze what you are working on in real-time.
               </p>
             </div>
 
